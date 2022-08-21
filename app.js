@@ -4,11 +4,12 @@ const path = require("path");
 const mongoose = require("mongoose");
 const ejsMate = require("ejs-mate");
 const Joi = require("joi");
-const { campgroundSchema } = require("./schemas");
+const { campgroundSchema, reviewSchema } = require("./schemas");
 const methodOverride = require("method-override");
 const catchAsync = require("./utils/catchAsync");
 const ExpressError = require("./utils/ExpressError");
 const Campground = require("./models/campground");
+const Review = require("./models/review");
 const { valid } = require("joi");
 
 mongoose
@@ -28,6 +29,8 @@ app.set("view engine", "ejs");
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride("_method"));
 
+// Schema Middle ware
+
 const validateCampground = (req, res, next) => {
   const { error } = campgroundSchema.validate(req.body);
   if (error) {
@@ -38,9 +41,25 @@ const validateCampground = (req, res, next) => {
   }
 };
 
+const validateReview = (req, res, next) => {
+  const { error } = reviewSchema.validate(req.body);
+  if (error) {
+    const msg = error.details.map((el) => el.message).join(",");
+    throw new ExpressError(msg, 400);
+  } else {
+    next();
+  }
+};
+
+// Homepage
+
 app.get("/", (req, res) => {
   res.render("home");
 });
+
+// ========================================
+// =============== Campground =============
+// ========================================
 
 // =============== Index =================
 
@@ -70,7 +89,7 @@ app.get(
   "/campgrounds/:id",
   catchAsync(async (req, res) => {
     const { id } = req.params;
-    const campground = await Campground.findById(id);
+    const campground = await Campground.findById(id).populate("reviews");
     res.render(`campgrounds/show`, { campground });
   })
 );
@@ -109,7 +128,38 @@ app.delete(
   })
 );
 
-// =============== Error Handling =================
+// ========================================
+// =============== Reviews ================
+// ========================================
+
+// =============== New Review =============
+
+app.post(
+  "/campgrounds/:id/reviews",
+  validateReview,
+  catchAsync(async (req, res) => {
+    const campground = await Campground.findById(req.params.id);
+    const review = new Review(req.body.review);
+    campground.reviews.push(review);
+    await review.save();
+    await campground.save();
+    res.redirect(`/campgrounds/${campground._id}`);
+  })
+);
+
+// =============== Delete Review =============
+
+app.delete(
+  "/campgrounds/:id/reviews/:reviewId",
+  catchAsync(async (req, res) => {
+    const { id, reviewId } = req.params;
+    await Campground.findByIdAndUpdate(id, { $pull: { reviews: reviewId } });
+    await Review.findByIdAndDelete(reviewId);
+    res.redirect(`/campgrounds/${id}`);
+  })
+);
+
+// =============== Error Handling ==============
 
 app.all("*", (req, res, next) => {
   next(new ExpressError("page not found", 404));
