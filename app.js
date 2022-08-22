@@ -16,7 +16,7 @@ const reviewRoutes = require("./routes/reviews");
 const userRoutes = require("./routes/users");
 
 mongoose
-  .connect("mongodb://10.166.1.77:27017/yelp-camp")
+  .connect("mongodb://10.166.2.32:27017/yelp-camp")
   .then(() => {
     console.log("Mongo Connection Open!!");
   })
@@ -54,7 +54,6 @@ passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
 app.use((req, res, next) => {
-  console.log(req.session);
   res.locals.success = req.flash("success");
   res.locals.error = req.flash("error");
   res.locals.currentUser = req.user;
