@@ -14,15 +14,15 @@ const ExpressError = require("./utils/ExpressError");
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
 const User = require("./models/user");
-const mongoSanitize = require("express-mongo-sanitize");
-const helmet = require("helmet");
-
+// const mongoSanitize = require("express-mongo-sanitize");
 const campgroundRoutes = require("./routes/campgrounds");
 const reviewRoutes = require("./routes/reviews");
 const userRoutes = require("./routes/users");
+const MongoStore = require("connect-mongo");
+const dbUrl = process.env.DB_URL || "mongodb://10.166.2.32:27017/yelp-camp";
 
 mongoose
-  .connect("mongodb://10.166.2.32:27017/yelp-camp")
+  .connect(dbUrl)
   .then(() => {
     console.log("Mongo Connection Open!!");
   })
@@ -38,12 +38,24 @@ app.set("view engine", "ejs");
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride("_method"));
 app.use(express.static(path.join(__dirname, "public")));
-app.use(mongoSanitize());
-app.use(helmet());
+// app.use(mongoSanitize());
+
+const secret = process.env.SECRET || "thisshouldbeabettersecret!";
+
+const store = MongoStore.create({
+  mongoUrl: dbUrl,
+  secret: secret,
+  touchAfter: 24 * 60 * 60,
+});
+
+store.on("error", function (e) {
+  console.log("SESSION STORE ERROR", e);
+});
 
 const sessionConfig = {
+  store,
   name: "session",
-  secret: "thisshouldbeabettersecret!",
+  secret: secret,
   resave: false,
   saveUninitialized: true,
   cookie: {
